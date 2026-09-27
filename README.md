@@ -239,14 +239,20 @@ Checked against `github.com/pixelmatix/SmartMatrix`:
 | Reference | State | Note |
 |---|---|---|
 | Latest release | **4.0.3**, 2020-12-18 | current Library Manager entry |
-| Last commit on `master` | 2024-01-10 | `master` and `teensylc` both still have this bug |
+| Maintainer's last commit anywhere | **2021-12-18** | Louis Beaudoin; the only later `master` commit (2023-06-11) is Eric Eason merging his own PR #174 |
+| Last commit on `master` | 2023-06-10 | `master` and `teensylc` both still have this bug |
+| Repo `pushed_at` | 2024-01-10 | a push to some branch, not a `master` commit |
 | Issue [#165](https://github.com/pixelmatix/SmartMatrix/issues/165) "Update to arduino-esp32 v2.0.3" | open since 2022-05 | same problem |
 | Issue [#171](https://github.com/pixelmatix/SmartMatrix/issues/171) "Can't compile to ESP32" | open since 2023-04 | reports the identical `'GPIO_PIN_MUX_REG' undeclared` error |
-| PR [#175](https://github.com/pixelmatix/SmartMatrix/pull/175) "Platform 2 support" | **open, unmerged** since 2023-10-25 | +5/-0 in one file, no comments |
+| PR [#175](https://github.com/pixelmatix/SmartMatrix/pull/175) "Platform 2 support" | **open, unmerged** since 2023-10-25 | +5/-0 in one file, `mergeable_state=clean`, no comments, no reviews; `updated_at` still equals `created_at` |
+| Open issues | 56 | |
 
 So the fix has been proposed upstream several times and has not been merged.
-This fork exists because the official Library Manager entry does not build on
-the ESP32 core that current Arduino IDE ships by default.
+PR #175 is the closest comparison available: a minimal, conflict-free, 5-line
+patch sat untouched for three years, which is about as strong a signal as one
+can get about the maintenance situation. This fork exists because the official
+Library Manager entry does not build on the ESP32 core that current Arduino IDE
+ships by default.
 
 **If the original maintainer would rather take this upstream, this fork should
 be discontinued in favour of the original.** The changes are small and additive;

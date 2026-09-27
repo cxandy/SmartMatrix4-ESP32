@@ -1,25 +1,31 @@
 # SmartMatrix4-ESP32
 
 > **This is a fork of [pixelmatix/SmartMatrix](https://github.com/pixelmatix/SmartMatrix) 4.0.3**
-> (MIT licensed, © 2020 Pixelmatix). It exists for one reason: **stock SmartMatrix
-> 4.0.3 does not compile on Arduino-ESP32 core 2.x or later**, which is the default
-> ESP32 core in current Arduino IDE releases.
+> (MIT licensed, © 2020 Pixelmatix). It exists because **stock SmartMatrix 4.0.3
+> does not compile on Arduino-ESP32 core 2.x or later**, which is the default
+> ESP32 core in current Arduino IDE releases, and because 4.0 silently dropped
+> two ESP32 pinouts that the 3.x line supported.
 >
-> **The only change in this fork is three added `#include` directives in
-> [`src/esp32_i2s_parallel.c`](src/esp32_i2s_parallel.c).** There are no functional,
-> structural, or API changes. Teensy support is untouched and identical to upstream.
->
-> Upstream is not inactive-by-policy — it is simply unmaintained since 4.0.3
-> (2020-12-18). If the original maintainer prefers to take this fix upstream,
-> please say so and this fork will be discontinued in favour of the original.
-> See [Upstream status](#upstream-status) below.
+> The diff is two changes, both listed below. Teensy support is untouched and
+> identical to upstream. Upstream is not inactive-by-policy — it is simply
+> unmaintained since 4.0.3 (2020-12-18). If the original maintainer prefers to
+> take these upstream, please say so and this fork will be discontinued in
+> favour of the original. See [Upstream status](#upstream-status) below.
 
-## Why this fork exists
+## What this fork changes
 
-SmartMatrix 4.0.3's ESP32 I2S-parallel driver (`src/esp32_i2s_parallel.c`) uses
-symbols that **still exist** in the ESP-IDF 4.4 headers shipped with
-Arduino-ESP32 2.x, but are no longer reached by that file's `#include` chain.
-The result is a build failure:
+| # | File | Change | Needed for |
+|---|---|---|---|
+| 1 | [`src/esp32_i2s_parallel.c`](src/esp32_i2s_parallel.c) | 3 added `#include` directives | building on core 2.x / 3.x |
+| 2 | [`src/MatrixHardware_ESP32_V0.h`](src/MatrixHardware_ESP32_V0.h) | restored `AZSMZ_ESP32Matrix_v12` and `AZSMZ_ESP32Matrix_v15` | boards wired for those pinouts |
+
+No functional, structural, or API changes to the display path.
+
+### 1. The core 2.x build fix
+
+4.0.3's ESP32 I2S-parallel driver uses symbols that **still exist** in the
+ESP-IDF 4.4 headers shipped with Arduino-ESP32 2.x, but are no longer reached by
+that file's `#include` chain. The result is a build failure:
 
 ```
 esp32_i2s_parallel.c:129: error: 'GPIO_PIN_MUX_REG' undeclared
@@ -43,8 +49,90 @@ entire Arduino HAL into this file. The three includes above are narrower and
 leave the build otherwise untouched. They are harmless on core 1.0.x, where those
 headers were already reached transitively.
 
-**Note:** core 3.x (IDF 5.x) is **not** verified — see
-[Verification](#verification).
+**Note:** core 3.x (IDF 5.x) is **not** verified — see [Verification](#verification).
+
+### 2. Restored `AZSMZ_ESP32Matrix_v12` / `v15` pinouts
+
+The 3.x `teensylc` line defined two more ESP32 boards in its hardware header:
+
+- `AZSMZ_ESP32Matrix_v12`
+- `AZSMZ_ESP32Matrix_v15`
+
+4.0 dropped both. A sketch that sets `GPIOPINOUT` to either one therefore hits
+the `#else` fallback in `MatrixHardware_ESP32_V0.h` and is silently wired to the
+"ESP32 forum" pinout instead — 14 signals on the wrong GPIOs, with no error and
+no warning. On a board that is actually wired for v12/v15 that produces
+garbage, and the cause is not obvious from the symptom.
+
+This fork restores both branches, carrying the pin assignments over unchanged
+from the 3.x header. To select one:
+
+```c
+#define GPIOPINOUT AZSMZ_ESP32Matrix_v15
+#include <MatrixHardware_ESP32_V0.h>
+```
+
+## Migrating a 3.x sketch to 4.x / this fork
+
+Beyond the renames documented in upstream's `MIGRATION.md`, one ESP32 change is
+a silent behavioural trap:
+
+**Set `SM_HUB75_OPTIONS_ESP32_INVERT_CLK` in `kMatrixOptions`.** 3.x hardcoded
+CLK inversion; 4.x made it an option that defaults to off. A sketch that does
+not set it clocks the panel on the wrong edge.
+
+```c
+const uint32_t kMatrixOptions = (SM_HUB75_OPTIONS_ESP32_INVERT_CLK);
+```
+
+Other 3.x → 4.x differences worth checking: `SMARTMATRIX_*_OPTIONS_NONE` was
+renamed to `SM_*_OPTIONS_NONE`, and 4.x `fillCircle` and friends accept
+`(rgb24)CRGB(...)` where 3.x's `rgb24` had no `CRGB` constructor.
+
+## Debugging channel alignment (optional patch)
+
+Not part of this fork, but worth knowing. For panels taller than 16 rows the two
+halves of the image are driven by two channel groups that end up in the *same*
+16-bit word, so they must be read from the same source frame. That is not
+obvious from the code, and a misalignment between the halves is very hard to
+judge by eye on a fast-moving pattern.
+
+To measure it rather than guess, add this to `loadMatrixBuffers48()` in
+`src/MatrixEsp32Hub75Calc_Impl.h` — immediately after the layer walk, before the
+`for(int j=0; j<COLOR_DEPTH_BITS; j++)` bitplane loop:
+
+```c
+        // tempRow0 feeds BIT_R1/G1/B1 (upper half, rows 0-15)
+        // tempRow1 feeds BIT_R2/G2/B2 (lower half, rows 16-31)
+        if(currentRow == 0){
+            static unsigned int dbgCount = 0;
+            if((++dbgCount % 50) == 0)
+                printf("LAGCHK upper=%u lower=%u\r\n",
+                       (unsigned int)tempRow0[0].red, (unsigned int)tempRow1[0].red);
+        }
+```
+
+Have the sketch write a frame counter into pixel `(0,0)` (upper half) and
+`(0,16)` (lower half). The two numbers must be equal on every line; a persistent
+`lower == upper + 1` means the halves really are one frame apart. Costs one
+`printf` per 50 calc passes.
+
+> **Method note:** prefer this to eyeballing. Judging sub-pixel alignment from a
+> 1-pixel pattern sweeping past at ~150 Hz is unreliable — while developing this
+> fork, an apparent one-column offset on a moving barcode turned out to be a
+> misreading, while the instrumented check reported equality on every sample.
+
+## Known upstream papercuts (not fixed here)
+
+- **Misleading `#pragma message`.** In `MatrixHardware_ESP32_V0.h` the
+  `#pragma message "ESP32 forum wiring"` sits inside the **v15** branch. If you
+  select v15 you get a message about forum wiring, which is not what is active.
+  Harmless, but confusing while debugging a pinout.
+- **Header name collision.** Both this fork and SmartMatrix 3.x ship a file
+  called `MatrixHardware_ESP32_V0.h`. If both libraries are installed, the one
+  Arduino picks first wins. 3.x's copy does not define `AZSMZ_*`, so
+  `AZSMZ_ESP32Matrix_v15` silently evaluates to 0 and you land on the forum
+  pinout. Keep only one of the two installed, or include the header by full path.
 
 ## Verification
 
@@ -52,14 +140,52 @@ headers were already reached transitively.
 |---|---|
 | Compiles on Arduino-ESP32 core 2.0.17 | ✅ verified |
 | Unmodified 4.0.3 on core 2.0.17 | ❌ fails with the errors above |
-| Panel output on hardware | ⚠️ see note |
+| Panel output on hardware | ✅ verified, see below |
 | Teensy builds | identical to upstream, untouched |
 | Core 3.x (IDF 5.x) | ❓ not tested |
 
-Examples verified to build on core 2.0.17 with this fork:
-`MultipleTextLayers`, `MultiRowRefreshMapping`, `FastLed_Functions`.
+Examples verified to build on core 2.0.17 with this fork: `MultipleTextLayers`,
+`MultiRowRefreshMapping`, `FastLed_Functions`. Note that these are cross-platform
+examples whose `MatrixHardware*.h` includes are all commented out, so an ESP32
+build needs the pinout selected first — this is upstream behaviour, not a fork
+change:
+
+```c
+#define GPIOPINOUT AZSMZ_ESP32Matrix_v15
+#include <MatrixHardware_ESP32_V0.h>
+#include <SmartMatrix.h>
+```
+
+Without it the build stops with
+`SmartMatrix.h:74: error: No MatrixHardware*.h file included`.
 (`Adafruit_Gfx` additionally requires the `Adafruit_GFX` library, which is an
 unrelated third-party dependency.)
+
+### Hardware verification
+
+Tested on a 64x32 HUB75 32-row MOD16-scan panel, `AZSMZ_ESP32Matrix_v15`
+pinout, Arduino-ESP32 core 2.0.17, QIO flash at 80 MHz, 4 MB partition
+`default`, `ESP32_I2S_CLOCK_SPEED` 20 MHz, refresh depth 36, 4 DMA buffer rows.
+
+What was established:
+
+- The fork's `src/esp32_i2s_parallel.c` differs from a separately
+  hardware-verified SmartMatrix 3.x → core 2.x port **only** by those three
+  `#include` lines. The I2S/DMA path is otherwise identical.
+- The two channel groups are confirmed to read the same source frame, using the
+  instrumentation described in
+  [Debugging channel alignment](#debugging-channel-alignment-optional-patch)
+  (13/13 samples equal). There is no channel-group skew in the data path.
+- Static column tests, a scrolling barcode, a moving circle, a per-column
+  static barcode, and the `FastLed_Functions` example (noise + circle +
+  scrolling text at brightness 30) all display correctly.
+
+**No functional defect was found in 4.0.3's display path.** Vertical striping
+was reported during development of this fork but **did not reproduce**; the most
+likely explanations are the dropped-pinout issue (change 2, since fixed) and
+insufficient USB supply — the test panel could not be driven from laptop USB
+without the board browning out. Treat striping on a 4.0.3-derived setup as a
+supply or pinout problem before suspecting the library.
 
 ### Core 3.x — the open question
 
@@ -87,8 +213,8 @@ This fork exists because the official Library Manager entry does not build on
 the ESP32 core that current Arduino IDE ships by default.
 
 **If the original maintainer would rather take this upstream, this fork should
-be discontinued in favour of the original.** The change is three `#include`
-lines; there is no reason to keep two copies of the library in circulation.
+be discontinued in favour of the original.** The changes are small and additive;
+there is no reason to keep two copies of the library in circulation.
 
 ---
 

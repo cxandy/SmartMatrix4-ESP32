@@ -39,6 +39,11 @@
 #define ESP32_JC_RIBBON_PINOUT_WEMOS    8
 #define HUB75_ADAPTER_LITE_V0_PINOUT    9
 #define ESP32_RGB64x32MatrixPanel_I2S_DMA_DEFAULT    10
+// Restored by this fork: these two existed in the 3.x "teensylc" line
+// (ESP32Matrix.h) but were dropped in 4.0, so boards wired for them lost
+// support on upgrade. Pin assignments are carried over unchanged.
+#define AZSMZ_ESP32Matrix_v12           11
+#define AZSMZ_ESP32Matrix_v15           12
 
 #ifndef GPIOPINOUT
 #define GPIOPINOUT ESP32_FORUM_PINOUT
@@ -264,6 +269,58 @@
     #define OE_PIN  GPIO_NUM_25
 
     #define CLK_PIN GPIO_NUM_22
+
+#elif (GPIOPINOUT == AZSMZ_ESP32Matrix_v12)
+
+    #pragma message "MatrixHardware: AZSMZ ESP32Matrix v12"
+
+    // ADDX is output directly using GPIO
+    #define CLKS_DURING_LATCH   0
+    #define MATRIX_I2S_MODE I2S_PARALLEL_BITS_16
+    #define MATRIX_DATA_STORAGE_TYPE uint16_t
+
+    #define R1_PIN  GPIO_NUM_17
+    #define G1_PIN  GPIO_NUM_2
+    #define B1_PIN  GPIO_NUM_16
+    #define R2_PIN  GPIO_NUM_4
+    #define G2_PIN  GPIO_NUM_15
+    #define B2_PIN  GPIO_NUM_13
+
+    #define A_PIN   GPIO_NUM_26
+    #define B_PIN   GPIO_NUM_27
+    #define C_PIN   GPIO_NUM_14
+    #define D_PIN   GPIO_NUM_12
+    #define E_PIN   -1
+    #define LAT_PIN GPIO_NUM_33
+    #define OE_PIN  GPIO_NUM_32
+
+    #define CLK_PIN GPIO_NUM_25
+
+#elif (GPIOPINOUT == AZSMZ_ESP32Matrix_v15)
+
+    #pragma message "MatrixHardware: AZSMZ ESP32Matrix v15"
+
+    // ADDX is output directly using GPIO
+    #define CLKS_DURING_LATCH   0
+    #define MATRIX_I2S_MODE I2S_PARALLEL_BITS_16
+    #define MATRIX_DATA_STORAGE_TYPE uint16_t
+
+    #define R1_PIN  GPIO_NUM_17
+    #define G1_PIN  GPIO_NUM_2
+    #define B1_PIN  GPIO_NUM_16
+    #define R2_PIN  GPIO_NUM_4
+    #define G2_PIN  GPIO_NUM_15
+    #define B2_PIN  GPIO_NUM_12
+
+    #define A_PIN   GPIO_NUM_26
+    #define B_PIN   GPIO_NUM_13
+    #define C_PIN   GPIO_NUM_14
+    #define D_PIN   GPIO_NUM_27
+    #define E_PIN   GPIO_NUM_22
+    #define LAT_PIN GPIO_NUM_33
+    #define OE_PIN  GPIO_NUM_32
+
+    #define CLK_PIN GPIO_NUM_25
 
 #elif (GPIOPINOUT == HUB75_ADAPTER_PINOUT)
 

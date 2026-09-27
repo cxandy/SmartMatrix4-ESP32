@@ -74,6 +74,23 @@ SMARTMATRIX_ALLOCATE_INDEXED_LAYER(indexedLayer, kMatrixWidth, kMatrixHeight, CO
 
 The options are the defaults for a 32x32 pixel panel, similar defaults to the SmartMatrix_32x32 library.  If you are using a 16x32 panel, change `kMatrixHeight` to 16, and `kPanelType` to `SMARTMATRIX_HUB75_16ROW_MOD8SCAN`.  
 
+> **ESP32 only — added by the SmartMatrix4-ESP32 fork.** 3.x hardcoded the CLK
+> output inversion; 4.0 turned it into an option that **defaults to off**. A
+> migrated ESP32 sketch that does not set it will clock the panel on the wrong
+> edge. Add it to `kMatrixOptions`:
+>
+> ```c
+> const uint32_t kMatrixOptions = (SM_HUB75_OPTIONS_ESP32_INVERT_CLK);
+> ```
+>
+> If you are combining it with other flags, bitwise-OR them, e.g.
+> `(SM_HUB75_OPTIONS_ESP32_INVERT_CLK | SM_HUB75_OPTIONS_C_SHAPE_STACKING)`.
+>
+> Also note that 4.0 dropped the `AZSMZ_ESP32Matrix_v12` and
+> `AZSMZ_ESP32Matrix_v15` pinouts; this fork restores them. Without the
+> restoration, a sketch selecting either one silently falls through to the
+> "ESP32 forum" pinout — 14 signals on the wrong GPIOs, no error, no warning.
+
 At this point if you try to compile, you'll get a lot of errors like:
 
 ```

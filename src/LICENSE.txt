@@ -28,10 +28,24 @@ https://github.com/pixelmatix/SmartMatrix
 
 The MIT license above is retained unchanged, as the license requires.
 
-The sole modification made in this fork is the addition of three #include
-directives to src/esp32_i2s_parallel.c, so that the ESP32 I2S-parallel code
-compiles against Arduino-ESP32 core 2.x and later. No functional, structural,
-or API changes were made. All original copyright remains with Pixelmatix.
+Changes made in this fork, all of them additive:
+
+1. src/esp32_i2s_parallel.c
+   Three #include directives, so the ESP32 I2S-parallel code compiles against
+   Arduino-ESP32 core 2.x (IDF 4.x), which no longer provides those headers
+   transitively. Verified on core 2.0.17; harmless on core 1.0.x.
+
+2. src/MatrixHardware_ESP32_V0.h
+   Restored the AZSMZ_ESP32Matrix_v12 and AZSMZ_ESP32Matrix_v15 pinout
+   branches. Both existed in the 3.x "teensylc" line's ESP32Matrix.h but were
+   dropped in 4.0, and without them a sketch selecting either one compiles
+   cleanly and is silently wired to the ESP32 forum pinout. Pin assignments
+   are carried over unchanged. Also adds AZSMZ_ESP32Matrix as an alias for
+   v15, the only revision currently sold; no GPIOPINOUT value is changed and
+   the versioned names still work.
+
+No functional, structural, or API changes were made beyond the above. All
+original copyright remains with Pixelmatix.
 
 Upstream: https://github.com/pixelmatix/SmartMatrix  (4.0.3, 2020-12-18)
 -------------------------------------------------------------------------------

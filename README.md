@@ -68,9 +68,45 @@ This fork restores both branches, carrying the pin assignments over unchanged
 from the 3.x header. To select one:
 
 ```c
-#define GPIOPINOUT AZSMZ_ESP32Matrix_v15
+#define GPIOPINOUT AZSMZ_ESP32Matrix
 #include <MatrixHardware_ESP32_V0.h>
 ```
+
+`AZSMZ_ESP32Matrix` is an alias for `AZSMZ_ESP32Matrix_v15`, the only revision
+AZSMZ currently sells; both names select the same pins. `AZSMZ_ESP32Matrix_v12`
+is still there for the older boards.
+
+#### A misspelled `GPIOPINOUT` fails silently
+
+This is not specific to the AZSMZ names — it applies to every pinout in this
+header, and it is inherited from upstream. An undefined identifier evaluates to
+`0` inside `#if`, and `ESP32_FORUM_PINOUT` is defined as `0`, so a typo does not
+fall through to the end of the chain: it matches the forum branch exactly.
+Verified on this fork:
+
+| `GPIOPINOUT` | compiles | branch taken |
+|---|---|---|
+| `AZSMZ_ESP32Matrix` | yes | AZSMZ v15 |
+| `AZSMZ_ESP32Matrix_v15` | yes | AZSMZ v15 |
+| `AZSMZ_ESP32Matrix_v12` | yes | AZSMZ v12 |
+| `AZSMZ_ESP32Matrix_v99` | **yes, no warning** | **ESP32 forum** |
+
+So the panel ends up driven on 14 wrong GPIOs. The only signal is the
+`#pragma message` line in the compile log — check it after any pinout change:
+
+```
+MatrixHardware_ESP32_V0.h:302:21: note: #pragma message: MatrixHardware: AZSMZ ESP32Matrix v15
+```
+
+Note that the resulting binary size is identical for the AZSMZ and forum pinouts,
+so the sketch size tells you nothing about which one was selected.
+
+This cannot be caught in the preprocessor. `#if` sees only the substituted value,
+never the identifier you typed, so no amount of `#else`/`#error` logic
+distinguishes a typo from a legitimate `0`. Catching it would require
+renumbering `ESP32_FORUM_PINOUT` away from `0`, which would break anyone who
+hardcoded that value. If you need a pinout this file does not have, use
+`MatrixHardware_Custom.h` as upstream's examples describe.
 
 ## Migrating a 3.x sketch to 4.x / this fork
 

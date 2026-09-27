@@ -44,6 +44,7 @@
 // support on upgrade. Pin assignments are carried over unchanged.
 #define AZSMZ_ESP32Matrix_v12           11
 #define AZSMZ_ESP32Matrix_v15           12
+#define AZSMZ_ESP32Matrix               AZSMZ_ESP32Matrix_v15
 
 #ifndef GPIOPINOUT
 #define GPIOPINOUT ESP32_FORUM_PINOUT
